@@ -1,6 +1,7 @@
 import Database from "bun:sqlite";
-import { Effect } from "effect";
+import { Effect, pipe } from "effect";
 import type { Book } from "../graphql/types";
+import { validateBookSchema, validateBooksSchema } from "../schema/book";
 import { BookService } from "./books";
 
 const db = new Database();
@@ -25,24 +26,27 @@ VALUES
 
 export const SqliteInMemoryBookService = BookService.of({
   getAll(): Effect.Effect<Book[], Error> {
-    return Effect.tryPromise({
-      try: async () => {
-        const books = db
+    const rawData = Effect.tryPromise({
+      try: async () =>
+        db
           .query(
-            `SELECT titles.title, authors.name AS author
-            FROM titles
-            JOIN authors ON titles.author_id = authors.id;
-          `
+            `
+        SELECT titles.title, authors.name AS author
+        FROM titles
+        JOIN authors ON titles.author_id = authors.id;
+        `
           )
-          .all() as Book[];
-        return books;
-      },
-
+          .all(),
       catch: (e) => new Error(`${e}`),
     });
+    return pipe(
+      rawData,
+      Effect.flatMap(validateBooksSchema),
+      Effect.mapError((p) => new Error(p.message))
+    ) as Effect.Effect<Book[], Error>;
   },
   getByAuthor(id: string): Effect.Effect<Book, Error> {
-    return Effect.tryPromise({
+    const rawData = Effect.tryPromise({
       try: async () =>
         db
           .query(
@@ -55,5 +59,10 @@ export const SqliteInMemoryBookService = BookService.of({
           .get(id) as Book,
       catch: (e) => new Error(`${e}`),
     });
+    return pipe(
+      rawData,
+      Effect.flatMap(validateBookSchema),
+      Effect.mapError((p) => new Error(p.message))
+    );
   },
 });
