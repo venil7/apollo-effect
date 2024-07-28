@@ -1,0 +1,6 @@
+schema: "src/graphql/schema.graphql"
+ignoreNoDocuments: true,
+generates:
+  "./src/graphql/types.ts":
+    plugins:
+      - typescript
